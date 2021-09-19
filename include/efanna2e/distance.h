@@ -5,7 +5,11 @@
 #ifndef EFANNA2E_DISTANCE_H
 #define EFANNA2E_DISTANCE_H
 
+#ifdef _MSC_VER
+#include <intrin.h>
+#else
 #include <x86intrin.h>
+#endif
 #include <iostream>
 namespace efanna2e{
   enum Metric{
@@ -25,7 +29,6 @@ namespace efanna2e{
         float compare(const float* a, const float* b, unsigned size) const {
             float result = 0;
 
-#ifdef __GNUC__
 #ifdef __AVX__
 
   #define AVX_L2SQR(addr1, addr2, dest, tmp1, tmp2) \
@@ -45,7 +48,7 @@ namespace efanna2e{
       const float *r = b;
       const float *e_l = l + DD;
       const float *e_r = r + DD;
-      float unpack[8] __attribute__ ((aligned (32))) = {0, 0, 0, 0, 0, 0, 0, 0};
+      alignas(32) float unpack[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
       sum = _mm256_loadu_ps(unpack);
       if(DR){AVX_L2SQR(e_l, e_r, sum, l0, r0);}
@@ -122,7 +125,6 @@ namespace efanna2e{
       }
 #endif
 #endif
-#endif
 
             return result;
         }
@@ -132,7 +134,6 @@ namespace efanna2e{
   public:
     float compare(const float* a, const float* b, unsigned size) const {
       float result = 0;
-#ifdef __GNUC__
 #ifdef __AVX__
       #define AVX_DOT(addr1, addr2, dest, tmp1, tmp2) \
           tmp1 = _mm256_loadu_ps(addr1);\
@@ -150,7 +151,7 @@ namespace efanna2e{
    	  const float *r = b;
       const float *e_l = l + DD;
    	  const float *e_r = r + DD;
-      float unpack[8] __attribute__ ((aligned (32))) = {0, 0, 0, 0, 0, 0, 0, 0};
+      alignas(32) float unpack[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
       sum = _mm256_loadu_ps(unpack);
       if(DR){AVX_DOT(e_l, e_r, sum, l0, r0);}
@@ -222,7 +223,6 @@ namespace efanna2e{
       }
 #endif
 #endif
-#endif
       return result;
     }
 
@@ -231,7 +231,6 @@ namespace efanna2e{
    public:
     float norm(const float* a, unsigned size) const{
       float result = 0;
-#ifdef __GNUC__
 #ifdef __AVX__
 #define AVX_L2NORM(addr, dest, tmp) \
     tmp = _mm256_loadu_ps(addr); \
@@ -245,7 +244,7 @@ namespace efanna2e{
     unsigned DD = D - DR;
     const float *l = a;
     const float *e_l = l + DD;
-    float unpack[8] __attribute__ ((aligned (32))) = {0, 0, 0, 0, 0, 0, 0, 0};
+    alignas(32) float unpack[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
     sum = _mm256_loadu_ps(unpack);
     if(DR){AVX_L2NORM(e_l, sum, l0);}
@@ -309,7 +308,6 @@ namespace efanna2e{
         result += (*a) * (*a);
         a++;
     }
-#endif
 #endif
 #endif
       return result;

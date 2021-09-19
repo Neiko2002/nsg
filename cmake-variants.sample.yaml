@@ -1,0 +1,24 @@
+buildType:
+  default: debug
+  choices:
+    debug:
+      short: Debug
+      long: Unoptimized, with debug info, asserts enabled.
+      buildType: Debug
+    release:
+      short: Release
+      long: Highest optimization level, no debug info, code or asserts.
+      buildType: Release
+    releaseWithDebugInfo:
+      short: RelWithDebInfo
+      long: Optimized, with debug info but no debug (output) code or asserts.
+      buildType: RelWithDebInfo
+
+main:
+  default: nsg
+  choices:
+    nsg:
+      short: nsg
+      long: Build nsg
+      settings:
+        CMAKE_TOOLCHAIN_FILE: "c:/3YOURMIND/vcpkg/scripts/buildsystems/vcpkg.cmake"

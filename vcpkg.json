@@ -1,0 +1,7 @@
+{
+    "name": "efanna2e",
+    "version-string": "1.0.0",
+    "dependencies": [
+        "boost-dynamic-bitset"
+    ]
+}
