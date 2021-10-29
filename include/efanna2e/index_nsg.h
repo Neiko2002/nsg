@@ -40,9 +40,13 @@ class IndexNSG : public Index {
       unsigned *indices);
   void OptimizeGraph(float* data);
 
+  std::vector<std::vector<unsigned>>& getCompactGraph() {
+      return final_graph_;
+  }
+
   protected:
-    typedef std::vector<std::vector<unsigned > > CompactGraph;
-    typedef std::vector<SimpleNeighbors > LockGraph;
+    typedef std::vector<std::vector<unsigned>> CompactGraph;
+    typedef std::vector<SimpleNeighbors> LockGraph;
     typedef std::vector<nhood> KNNGraph;
 
     CompactGraph final_graph_;

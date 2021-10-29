@@ -43,7 +43,7 @@ class Parameters {
   std::unordered_map<std::string, std::string> params;
 
   template<typename ParamType>
-  inline ParamType ConvertStrToValue(const std::string &str) const {
+  ParamType ConvertStrToValue(const std::string &str) const {
     std::stringstream sstream(str);
     ParamType value;
     if (!(sstream >> value) || !sstream.eof()) {
@@ -52,6 +52,11 @@ class Parameters {
       throw std::runtime_error(err.str());
     }
     return value;
+  }
+
+  template<> 
+  std::string ConvertStrToValue<std::string>(const std::string &str) const {
+    return str;
   }
 
 };
