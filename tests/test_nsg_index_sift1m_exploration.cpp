@@ -64,10 +64,10 @@ int main(int argc, char** argv) {
 
   auto object_file      = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_base.fvecs)";
   auto nsg_file         = R"(c:/Data/Feature/SIFT1M/nsg/sift.nsg)";
-  auto query_file       = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_query.fvecs)";
-  auto groundtruth_file = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_groundtruth.ivecs)";
-  bool optimize_graph = false;  // uses normalized distances and DistanceFastL2 and prefetching
-  unsigned K = 100;
+  auto query_file       = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_query.fvecs)";
+  auto groundtruth_file = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_ground_truth.ivecs)";
+  auto entry_node_file  = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_entry_node.ivecs)";
+  uint32_t max_k = 1000;
 
   // load feature vectors
   float* data_load = NULL;
@@ -78,8 +78,6 @@ int main(int argc, char** argv) {
   // create the index
   efanna2e::IndexNSG index(dim, points_num, efanna2e::L2, nullptr);
   index.Load(nsg_file);
-  if(optimize_graph) 
-    index.OptimizeGraph(data_load);
 
   // query data
   float* query_data = NULL;
@@ -91,43 +89,43 @@ int main(int argc, char** argv) {
   unsigned groundtruth_num, groundtruth_dim;
   load_data(groundtruth_file, groundtruth_f, groundtruth_num, groundtruth_dim);
   const auto ground_truth = (uint32_t*)groundtruth_f; // not very clean, works as long as sizeof(int) == sizeof(float)
-  const auto answers = get_ground_truth(ground_truth, groundtruth_num, groundtruth_dim, K);
 
-  std::cout << "Evaluate graph (optimized=" << optimize_graph << ")" << std::endl;
-  std::vector<unsigned> L_search_parameter = { 100, 120, 140, 170, 200, 300 };
-  for (float L_search : L_search_parameter) {
+  // load entry node
+  float* entry_node_f = NULL;
+  unsigned entry_node_num, entry_node_dim;
+  load_data(entry_node_file, entry_node_f, entry_node_num, entry_node_dim);
+  const auto entry_node = (uint32_t*)entry_node_f; // not very clean, works as long as sizeof(int) == sizeof(float)
 
-    if (L_search < K) {
-      std::cout << "search_L cannot be smaller than search_K!" << std::endl;
-      exit(-1);
-    }
+  // try differen P_search parameters
+  /*auto steps = 100;
+  for (size_t i = 1; i <= steps; i++) {
+    const auto K = max_k/steps*i;
+    const auto max_distance_computation_count = K;*/
+  auto steps = 30;
+  for (size_t i = 0; i <= steps; i++) {
+    const auto K = max_k;
+    const auto max_distance_count = K + (K/10 * i);
 
-    efanna2e::Parameters paras;
-    paras.Set<unsigned>("L_search", L_search);
-    paras.Set<unsigned>("P_search", L_search);
+    const auto answers = get_ground_truth(ground_truth, groundtruth_num, groundtruth_dim, K);
 
+    auto tmp = std::vector<unsigned>(K);
     auto time_begin = std::chrono::steady_clock::now();
 
     size_t correct = 0;
     for (unsigned i = 0; i < query_num; i++) {
-      std::vector<unsigned> tmp(K);
-      if(optimize_graph) 
-        index.SearchWithOptGraph(query_data + i * query_dim, K, paras, tmp.data());
-      else
-        index.Search(query_data + i * query_dim, data_load, K, paras, tmp.data());
+      auto entry_node_index = entry_node[i * entry_node_dim];
+      index.Explore(entry_node_index, data_load, K, tmp.data(), max_distance_count);
 
       // compare answer with ann
       auto answer = answers[i];
-      for (size_t r = 0; r < K; r++)
+      for (size_t r = 0; r < K; r++) 
         if (answer.find(tmp[r]) != answer.end()) correct++;
     }
 
+    auto recall = 1.0f * correct / (query_num * K);
     auto time_end = std::chrono::steady_clock::now();
     auto time_us_per_query = (std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count()) / query_num;
-    auto recall = 1.0f * correct / (query_num * K);
-    std::cout << "L_search " << L_search << ", recall " << recall << ", time_us_per_query " << time_us_per_query << std::endl;
-    if (recall > 1.0)
-      break;
+    std::cout << "k and p " << K << ", max_distance_count " << max_distance_count << ", recall " << recall << " time_us_per_query " << time_us_per_query << std::endl;
   }
 
   return 0;

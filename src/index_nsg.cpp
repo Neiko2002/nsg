@@ -432,6 +432,102 @@ void IndexNSG::Build(size_t n, const float *data, const Parameters &parameters) 
   has_built = true;
 }
 
+
+void IndexNSG::Explore(const unsigned initial_node_id, const float *x, const size_t K_target, unsigned *indices, const uint32_t max_distance_computation_count) {
+  data_ = x;
+
+  boost::dynamic_bitset<> flags{nd_, 0};
+  uint32_t distance_computation_count = 0;
+  auto retset = std::vector<Neighbor>(K_target + 1);  
+
+  // initial element
+  auto query = data_ + dimension_ * initial_node_id;
+  auto L = 0;
+  {
+    flags[initial_node_id] = true;
+    auto& neighbors = final_graph_[initial_node_id];
+    unsigned MaxM = neighbors.size();
+
+    // prefetch neighbor ids
+    _mm_prefetch(reinterpret_cast<const char*>(neighbors.data()), _MM_HINT_T0);      
+    for (unsigned m = 0; m < MaxM; ++m)
+      _mm_prefetch(reinterpret_cast<const char*>(data_ + dimension_ * neighbors[m]), _MM_HINT_T0); // prefetch neighbor features
+
+    for (unsigned m = 0; m < MaxM; ++m) {
+      unsigned neighbor_id = neighbors[m];
+
+      float dist = distance_->compare(data_ + dimension_ * neighbor_id, query, (unsigned)dimension_);
+      retset[m] = Neighbor(neighbor_id, dist, true);
+      flags[neighbor_id] = true;
+      L++;
+
+      // early stop after to many computations
+      distance_computation_count++;
+      if(distance_computation_count >= max_distance_computation_count)
+        break;
+    }
+  }
+  std::sort(retset.begin(), retset.begin() + L);
+
+  // fill the retset array with the worst possible element
+  auto max_id = std::numeric_limits<unsigned int>::max();
+  auto max_dist = std::numeric_limits<float>::max();
+  for (; L < K_target; L++)
+    retset[L] = Neighbor(max_id, max_dist, true);
+
+  // try other elements
+  int k = 0;
+  while (k < L && distance_computation_count < max_distance_computation_count) {
+    int nk = L;
+
+    if (retset[k].flag) {
+      retset[k].flag = false;
+
+      auto id = retset[k].id;
+      auto& neighbors = final_graph_[id];
+      unsigned MaxM = neighbors.size();
+
+      // prefetch neighbor idds
+      _mm_prefetch(reinterpret_cast<const char*>(neighbors.data()), _MM_HINT_T0);      
+      for (unsigned m = 0; m < MaxM; ++m)
+        _mm_prefetch(reinterpret_cast<const char*>(data_ + dimension_ * neighbors[m]), _MM_HINT_T0); // prefetch neighbor features
+
+      // iterate all neighbors
+      for (unsigned m = 0; m < MaxM; ++m) {
+        unsigned neighbor_id = neighbors[m];
+        if (flags[neighbor_id]) 
+          continue;
+        flags[neighbor_id] = true;
+
+        // compute distance from query to neighbor
+        float dist = distance_->compare(query, data_ + dimension_ * neighbor_id, (unsigned)dimension_);
+        if (dist >= retset[L - 1].distance) 
+          continue;
+
+        auto nn = Neighbor(neighbor_id, dist, true);
+        int r = InsertIntoPool(retset.data(), L, nn);
+
+        if (r < nk) 
+          nk = r;
+
+        // early stop after to many computations
+        distance_computation_count++;
+        if(distance_computation_count >= max_distance_computation_count)
+          break;
+      }
+    }
+
+    // was an element placed better than the current position?
+    if (nk <= k)
+      k = nk;
+    else
+      ++k;
+  }
+
+  for (size_t i = 0; i < L; i++) 
+    indices[i] = retset[i].id;
+}
+
 void IndexNSG::Search(const float *query, const float *x, size_t K, const Parameters &parameters, unsigned *indices) {
   unsigned L = parameters.Get<unsigned>("L_search");
   data_ = x;

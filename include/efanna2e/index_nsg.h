@@ -27,6 +27,7 @@ class IndexNSG : public Index {
 
   virtual void Build(size_t n, const float *data, const Parameters &parameters) override;
 
+  virtual void Explore(const unsigned initial_node, const float *x, size_t K, unsigned *indices, const uint32_t max_distance_computation_count);
   virtual void Search(
       const float *query,
       const float *x,
