@@ -1,4 +1,4 @@
-set(CPP_SOURCES index_nsg.cpp index.cpp)
+set(CPP_SOURCES index_nsg.cpp index.cpp util.cpp)
 
 add_library(${PROJECT_NAME} STATIC ${CPP_SOURCES})
 
