@@ -4,6 +4,14 @@
 
 #ifndef EFANNA2E_UTIL_H
 #define EFANNA2E_UTIL_H
+
+#if defined(_WIN32)
+    #define NOMINMAX
+    #include <windows.h>
+    // #include <psapi.h> // Disabled due to compilation errors
+    #include <limits>
+#endif
+
 #include <algorithm>
 #include <cstring>
 #include <iostream>
@@ -11,7 +19,9 @@
 
 #ifdef __APPLE__
 #else
-    #include <malloc.h>
+    #ifndef _WIN32
+        #include <malloc.h>
+    #endif
 #endif
 
 #ifdef __AVX__
@@ -43,26 +53,24 @@ static void GenRandom(std::mt19937& rng, unsigned* addr, unsigned size, unsigned
 }
 
 inline float* data_align(float* data_ori, unsigned point_num, unsigned& dim) {
-    return data_ori;
+    float* data_new = 0;
+    unsigned new_dim = (dim + DATA_ALIGN_FACTOR - 1) / DATA_ALIGN_FACTOR * DATA_ALIGN_FACTOR;
+    // std::cout << "align to new dim: "<<new_dim << std::endl;
+    struct alignas(DATA_ALIGN_FACTOR * 4) OverAligned {
+        char b;
+    };
+    size_t num_bytes = point_num * new_dim * sizeof(float);
+    size_t num_aligned = (num_bytes + sizeof(OverAligned) - 1) / sizeof(OverAligned);
+    data_new = (float*)new OverAligned[num_aligned];
 
-    //   //std::cout << "align with : "<<DATA_ALIGN_FACTOR << std::endl;
-    //   float* data_new=0;
-    //   unsigned new_dim = (dim + DATA_ALIGN_FACTOR - 1) / DATA_ALIGN_FACTOR *
-    //   DATA_ALIGN_FACTOR;
-    //   //std::cout << "align to new dim: "<<new_dim << std::endl;
-    //   struct alignas(DATA_ALIGN_FACTOR * 4) OverAligned { char b; };
-    //   data_new = (float*) new OverAligned[point_num * new_dim * sizeof(float)];
-
-    //   for(unsigned i=0; i<point_num; i++){
-    //     memcpy(data_new + i * new_dim, data_ori + i * dim, dim *
-    //     sizeof(float)); memset(data_new + i * new_dim + dim, 0, (new_dim - dim)
-    //     * sizeof(float));
-    //   }
-    //   dim = new_dim;
-    //   delete[] data_ori;
-    //   return data_new;
+    for (unsigned i = 0; i < point_num; i++) {
+        memcpy(data_new + i * new_dim, data_ori + i * dim, dim * sizeof(float));
+        memset(data_new + i * new_dim + dim, 0, (new_dim - dim) * sizeof(float));
+    }
+    dim = new_dim;
+    delete[] data_ori;
+    return data_new;
 }
-
 }  // namespace efanna2e
 
 /*
@@ -72,17 +80,7 @@ inline float* data_align(float* data_ori, unsigned point_num, unsigned& dim) {
  *          http://creativecommons.org/licenses/by/3.0/deed.en_US
  */
 
-#if defined(_WIN32)
-
-    // windows.h will define max/min as macro, disable this function and import
-    // limits instead
-    #define NOMINMAX
-    #include <psapi.h>
-    #include <windows.h>
-
-    #include <limits>
-
-#elif defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__unix__) || defined(__unix) || defined(unix) || (defined(__APPLE__) && defined(__MACH__))
 
     #include <sys/resource.h>
     #include <unistd.h>
@@ -100,7 +98,9 @@ inline float* data_align(float* data_ori, unsigned point_num, unsigned& dim) {
     #endif
 
 #else
-    #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
+    #ifndef _WIN32
+        #error "Cannot define getPeakRSS( ) or getCurrentRSS( ) for an unknown OS."
+    #endif
 #endif
 
 /**
@@ -111,9 +111,10 @@ inline float* data_align(float* data_ori, unsigned point_num, unsigned& dim) {
 static size_t getPeakRSS() {
 #if defined(_WIN32)
     /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t)info.PeakWorkingSetSize;
+    // PROCESS_MEMORY_COUNTERS info;
+    // GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+    // return (size_t)info.PeakWorkingSetSize;
+    return 0;  // Disabled
 
 #elif (defined(_AIX) || defined(__TOS__AIX__)) || \
     (defined(__sun__) || defined(__sun) || defined(sun) && (defined(__SVR4) || defined(__svr4__)))
@@ -151,9 +152,10 @@ static size_t getPeakRSS() {
 static size_t getCurrentRSS() {
 #if defined(_WIN32)
     /* Windows -------------------------------------------------- */
-    PROCESS_MEMORY_COUNTERS info;
-    GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
-    return (size_t)info.WorkingSetSize;
+    // PROCESS_MEMORY_COUNTERS info;
+    // GetProcessMemoryInfo(GetCurrentProcess(), &info, sizeof(info));
+    // return (size_t)info.WorkingSetSize;
+    return 0;  // Disabled
 
 #elif defined(__APPLE__) && defined(__MACH__)
     /* OSX ------------------------------------------------------ */

@@ -7,9 +7,14 @@
 #ifndef EFANNA2E_GRAPH_H
 #define EFANNA2E_GRAPH_H
 
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <mutex>
+#include <random>
 #include <vector>
+
+#include "util.h"
 
 
 namespace efanna2e {

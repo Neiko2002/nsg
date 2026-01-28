@@ -21,4 +21,5 @@ main:
       short: nsg
       long: Build nsg
       settings:
+        DATA_PATH: "e:/Data/ANN/"
         CMAKE_TOOLCHAIN_FILE: "c:/3YOURMIND/vcpkg/scripts/buildsystems/vcpkg.cmake"
