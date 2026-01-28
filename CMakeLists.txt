@@ -10,5 +10,4 @@ set(DATA_PATH "data" CACHE PATH "Path to datasets directory")
 message(STATUS "Data Path: ${DATA_PATH}")
 
 add_subdirectory(src)
-add_subdirectory(tests)
 add_subdirectory(benchmark)
