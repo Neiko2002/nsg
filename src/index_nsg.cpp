@@ -10,7 +10,6 @@
 #include "efanna2e/exceptions.h"
 #include "efanna2e/parameters.h"
 
-
 namespace efanna2e {
 #define _CONTROL_NUM 100
 IndexNSG::IndexNSG(const size_t dimension, const size_t n, Metric m, Index* initializer)
@@ -423,18 +422,19 @@ void IndexNSG::Build(size_t n, const float* data, const Parameters& parameters) 
 }
 
 void IndexNSG::Explore(const unsigned initial_node_id,
-                       const float* x,
+                       const float* query_data,
+                       const float* dataset_data,
                        const size_t K_target,
                        unsigned* indices,
                        const uint32_t max_distance_computation_count) {
-    data_ = x;
+    data_ = dataset_data;
 
     boost::dynamic_bitset<> flags{nd_, 0};
     uint32_t distance_computation_count = 0;
     auto retset = std::vector<Neighbor>(K_target + 1);
 
     // initial element
-    auto query = data_ + dimension_ * initial_node_id;
+    auto query = query_data;
     auto L = 0;
     {
         flags[initial_node_id] = true;

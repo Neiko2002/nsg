@@ -73,9 +73,9 @@ static void test_graph_anns(T* graph,
 }
 
 // Exploration test (from entry nodes)
-// Exploration test (from entry nodes)
 template <typename T>
 static void test_graph_explore(T* graph,
+                               const float* base_data,
                                const float* query_data,
                                size_t query_count,
                                size_t dim,
@@ -112,7 +112,7 @@ static void test_graph_explore(T* graph,
                 std::fill(result.begin(), result.end(), 0u);
 
                 unsigned initial_node = entry_node_indices[q][0];
-                graph->Explore(initial_node, query_data + q * dim, k, result.data(), max_distance_count);
+                graph->Explore(initial_node, query_data + q * dim, base_data, k, result.data(), max_distance_count);
 
                 if (q < ground_truth.size()) {
                     const auto& gt = ground_truth[q];

@@ -146,6 +146,7 @@ static void run_anns_test(efanna2e::Index* index,
 
 static void run_explore_test(efanna2e::IndexNSG* index,
                              const Dataset& ds,
+                             const float* base_data,
                              const float* query_data,
                              size_t query_count,
                              size_t dim,
@@ -201,7 +202,8 @@ static void run_explore_test(efanna2e::IndexNSG* index,
     }
 
     wait_before_test();
-    test_graph_explore(index, explore_queries.data, explore_queries.num, explore_queries.dim, explore_gt_vec, entry_indices, cg.explore_k);
+    test_graph_explore(
+        index, base_data, explore_queries.data, explore_queries.num, explore_queries.dim, explore_gt_vec, entry_indices, cg.explore_k);
 }
 
 static void run_create_graph_test(const Dataset& ds,
@@ -248,7 +250,7 @@ static void run_create_graph_test(const Dataset& ds,
         log("ANNS Test complete\n");
 
         log("\n--- Exploration Test (k=%u) ---\n", cg.explore_k);
-        run_explore_test(index.get(), ds, query_data.data, query_data.num, query_data.dim, cg, false);
+        run_explore_test(index.get(), ds, base_data.data, query_data.data, query_data.num, query_data.dim, cg, false);
         log("Exploration Test complete\n");
     }
 
@@ -278,7 +280,7 @@ int main(int argc, char** argv) {
     const auto data_path = std::filesystem::path(DATA_PATH);
     log("data_path %s\n", data_path.string().c_str());
 
-    DatasetName ds_name = DatasetName::AUDIO;
+    DatasetName ds_name = DatasetName::ALL;
     std::string data_root = data_path.string();
     bool do_run = true;
 
