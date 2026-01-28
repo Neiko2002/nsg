@@ -50,7 +50,15 @@ static std::vector<std::unordered_set<uint32_t>> get_ground_truth(const uint32_t
 
 int main(int argc, char** argv) {
 
+  #if defined(__AVX__)
+    std::cout << "use AVX2  ..." << std::endl;
+  #elif defined(__SSE2__)
+    std::cout << "use SSE  ..." << std::endl;
+  #else
+    std::cout << "use arch  ..." << std::endl;
+  #endif
   std::cout << "DATA_ALIGN_FACTOR " << DATA_ALIGN_FACTOR << std::endl;
+
   #ifdef _OPENMP
         omp_set_dynamic(0);     // Explicitly disable dynamic teams
         omp_set_num_threads(1); // Use 1 threads for all consecutive parallel regions
@@ -58,26 +66,28 @@ int main(int argc, char** argv) {
         std::cout << "_OPENMP " << omp_get_num_threads() << " threads" << std::endl;
   #endif
 
-  #ifdef __AVX__
-    std::cout << "__AVX__ is set" << std::endl;
-  #endif
-
-  auto object_file      = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_base.fvecs)";
-  auto nsg_file         = R"(c:/Data/Feature/SIFT1M/nsg/sift.nsg)";
-  auto query_file       = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_query.fvecs)";
-  auto groundtruth_file = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_ground_truth.ivecs)";
-  auto entry_node_file  = R"(c:/Data/Feature/SIFT1M/SIFT1M/sift_explore_entry_node.ivecs)";
-  uint32_t max_k = 1000;
+  auto object_file      = R"(e:/Data/Feature/GloVe/glove-100/glove-100_base.fvecs)";
+  auto query_file       = R"(e:/Data/Feature/GloVe/glove-100/glove-100_query.fvecs)";
+  auto groundtruth_file = R"(e:/Data/Feature/GloVe/glove-100/glove-100_groundtruth.ivecs)";
+  auto nsg_file         = R"(e:/Data/Feature/GloVe/nsg/glove-100_L50_R70_C500_EfaK400_L420_It12_S15_R200.nsg)";
+  bool optimize_graph = false;  // uses normalized distances and DistanceFastL2 and prefetching
+  unsigned K = 100;
 
   // load feature vectors
+  std::cout << "Load basedata and align" << std::endl;
   float* data_load = NULL;
   unsigned points_num, dim;
   load_data(object_file, data_load, points_num, dim);
   data_load = efanna2e::data_align(data_load, points_num, dim); // align the data before build
+  std::cout << "Actual memory usage: " << getCurrentRSS() / 1000000 << " Mb, Max memory usage: " << getPeakRSS() / 1000000 << " Mb after loading base data and align" << std::endl;
 
-  // create the index
-  efanna2e::IndexNSG index(dim, points_num, efanna2e::L2, nullptr);
+  // load the index
+  std::cout << "Load graph" << std::endl;
+  auto index =  efanna2e::IndexNSG(dim, points_num, efanna2e::L2, nullptr);
   index.Load(nsg_file);
+  if(optimize_graph) 
+    index.OptimizeGraph(data_load);
+  std::cout << "Actual memory usage: " << getCurrentRSS() / 1000000 << " Mb, Max memory usage: " << getPeakRSS() / 1000000 << " Mb after loading graph" << std::endl;
 
   // query data
   float* query_data = NULL;
@@ -89,43 +99,43 @@ int main(int argc, char** argv) {
   unsigned groundtruth_num, groundtruth_dim;
   load_data(groundtruth_file, groundtruth_f, groundtruth_num, groundtruth_dim);
   const auto ground_truth = (uint32_t*)groundtruth_f; // not very clean, works as long as sizeof(int) == sizeof(float)
+  const auto answers = get_ground_truth(ground_truth, groundtruth_num, groundtruth_dim, K);
 
-  // load entry node
-  float* entry_node_f = NULL;
-  unsigned entry_node_num, entry_node_dim;
-  load_data(entry_node_file, entry_node_f, entry_node_num, entry_node_dim);
-  const auto entry_node = (uint32_t*)entry_node_f; // not very clean, works as long as sizeof(int) == sizeof(float)
+  std::cout << "Evaluate graph (optimized=" << optimize_graph << ")" << std::endl;
+  std::vector<unsigned> L_search_parameter = { 500, 1000, 1500, 2500, 4000, 8000, 16000 };
+  for (float L_search : L_search_parameter) {
 
-  // try differen P_search parameters
-  /*auto steps = 100;
-  for (size_t i = 1; i <= steps; i++) {
-    const auto K = max_k/steps*i;
-    const auto max_distance_computation_count = K;*/
-  auto steps = 30;
-  for (size_t i = 0; i <= steps; i++) {
-    const auto K = max_k;
-    const auto max_distance_count = K + (K/10 * i);
+    if (L_search < K) {
+      std::cout << "search_L cannot be smaller than search_K!" << std::endl;
+      exit(-1);
+    }
 
-    const auto answers = get_ground_truth(ground_truth, groundtruth_num, groundtruth_dim, K);
+    efanna2e::Parameters paras;
+    paras.Set<unsigned>("L_search", L_search);
+    paras.Set<unsigned>("P_search", L_search);
 
-    auto tmp = std::vector<unsigned>(K);
     auto time_begin = std::chrono::steady_clock::now();
 
     size_t correct = 0;
     for (unsigned i = 0; i < query_num; i++) {
-      auto entry_node_index = entry_node[i * entry_node_dim];
-      index.Explore(entry_node_index, data_load, K, tmp.data(), max_distance_count);
+      std::vector<unsigned> tmp(K);
+      if(optimize_graph) 
+        index.SearchWithOptGraph(query_data + i * query_dim, K, paras, tmp.data());
+      else
+        index.Search(query_data + i * query_dim, data_load, K, paras, tmp.data());
 
       // compare answer with ann
       auto answer = answers[i];
-      for (size_t r = 0; r < K; r++) 
+      for (size_t r = 0; r < K; r++)
         if (answer.find(tmp[r]) != answer.end()) correct++;
     }
 
-    auto recall = 1.0f * correct / (query_num * K);
     auto time_end = std::chrono::steady_clock::now();
     auto time_us_per_query = (std::chrono::duration_cast<std::chrono::microseconds>(time_end - time_begin).count()) / query_num;
-    std::cout << "k and p " << K << ", max_distance_count " << max_distance_count << ", recall " << recall << " time_us_per_query " << time_us_per_query << std::endl;
+    auto recall = 1.0f * correct / (query_num * K);
+    std::cout << "L_search " << L_search << ", recall " << recall << ", time_us_per_query " << time_us_per_query << std::endl;
+    if (recall > 1.0)
+      break;
   }
 
   return 0;

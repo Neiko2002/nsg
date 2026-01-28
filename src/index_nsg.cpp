@@ -370,7 +370,7 @@ void IndexNSG::Link(const Parameters &parameters, SimpleNeighbor *cut_graph_) {
       cnt++;
       if(cnt % step_size == 0){
         LockGuard g(progress_lock);
-        std::cout<<progress++ <<"/"<< percent << " completed" << std::endl;
+        std::cout<<progress++ <<"/"<< percent << " completed. memory usage: " << getCurrentRSS() / 1000000 << " Mb, peak memory usage: " << getPeakRSS() / 1000000 << std::endl;
         }
       }
   }
@@ -473,7 +473,7 @@ void IndexNSG::Explore(const unsigned initial_node_id, const float *x, const siz
   auto max_id = std::numeric_limits<unsigned int>::max();
   auto max_dist = std::numeric_limits<float>::max();
   for (; L < K_target; L++)
-    retset[L] = Neighbor(max_id, max_dist, true);
+    retset[L] = Neighbor(max_id, max_dist, false);
 
   // try other elements
   int k = 0;

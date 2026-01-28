@@ -45,6 +45,10 @@ class IndexNSG : public Index {
       return final_graph_;
   }
 
+  unsigned getSeedNode() {
+      return ep_;
+  }
+
   protected:
     typedef std::vector<std::vector<unsigned>> CompactGraph;
     typedef std::vector<SimpleNeighbors> LockGraph;
