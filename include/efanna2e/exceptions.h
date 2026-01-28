@@ -12,10 +12,10 @@
 namespace efanna2e {
 
 class NotImplementedException : public std::logic_error {
- public:
-  NotImplementedException() : std::logic_error("Function not yet implemented.") {}
+public:
+    NotImplementedException() : std::logic_error("Function not yet implemented.") {}
 };
 
-}
+}  // namespace efanna2e
 
-#endif //EFANNA2E_EXCEPTIONS_H
+#endif  // EFANNA2E_EXCEPTIONS_H
