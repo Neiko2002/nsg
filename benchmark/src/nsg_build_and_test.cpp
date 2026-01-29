@@ -38,6 +38,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.iter = 10;
         conf.create_graph.S = 10;
         conf.create_graph.R = 100;
+        conf.create_graph.L_search = {100, 120, 140, 170, 200, 300, 500};
 
         // NSG params
         conf.nsg.L = 40;
@@ -51,6 +52,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.R = 100;
         conf.create_graph.nTrees = 0;
         conf.create_graph.mLevel = 0;
+        conf.create_graph.L_search = {100, 150, 200, 300, 600};
 
         conf.nsg.L = 40;
         conf.nsg.R = 50;
@@ -61,6 +63,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.iter = 12;
         conf.create_graph.S = 15;
         conf.create_graph.R = 200;
+        conf.create_graph.L_search = {500, 1000, 1500, 2000, 3000, 4000};
 
         conf.nsg.L = 50;
         conf.nsg.R = 70;
@@ -71,6 +74,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.iter = 7;
         conf.create_graph.S = 25;
         conf.create_graph.R = 200;
+        conf.create_graph.L_search = {100, 120, 140, 170, 200, 300};
 
         conf.nsg.L = 150;
         conf.nsg.R = 60;
@@ -223,12 +227,6 @@ static void run_create_graph_test(const Dataset& ds,
         return;
     }
 
-    log("\n=== %s Test ===\n", test_name.c_str());
-    log("KNN Input: %s\n", knn_path.c_str());
-    log("Settings: L=%u, R=%u, C=%u\n", nsg.L, nsg.R, nsg.C);
-    log("Graph: %s\n", graph_path.c_str());
-    log("Log: %s\n", log_path.c_str());
-
     std::filesystem::create_directories(paths.graph_directory());
     if (std::filesystem::exists(log_path)) {
         log("CREATE_GRAPH: Skipping - log file already exists: %s\n", log_path.c_str());
@@ -236,9 +234,22 @@ static void run_create_graph_test(const Dataset& ds,
     }
     set_log_file(log_path, true);
     attach_cerr_to_log();
+    attach_cout_to_log();
+
+    log("\n=== %s Test ===\n", test_name.c_str());
+    log("KNN Input: %s\n", knn_path.c_str());
+    log("Settings: L=%u, R=%u, C=%u\n", nsg.L, nsg.R, nsg.C);
+    log("Graph: %s\n", graph_path.c_str());
+    log("Log: %s\n", log_path.c_str());
+#ifdef _OPENMP
+    log("Threads: %d\n", omp_get_max_threads());
+#else
+    log("Threads: 1 (OpenMP disabled)\n");
+#endif
 
     log("Base data: size=%u, dim=%u\n", base_data.num, base_data.dim);
     log("Query data: size=%u, dim=%u\n", query_data.num, query_data.dim);
+    log("Memory usage before build: %zu Mb, Peak memory usage: %zu Mb\n", getCurrentRSS() / 1000000, getPeakRSS() / 1000000);
 
     auto index = load_or_build_nsg_index(ds, base_data.data, base_data.num, base_data.dim, nsg, knn_path, graph_path);
 
@@ -274,7 +285,7 @@ int main(int argc, char** argv) {
     omp_set_dynamic(0);      // Explicitly disable dynamic teams
     omp_set_num_threads(1);  // Use 1 threads for all consecutive parallel regions
 
-    std::cout << "_OPENMP " << omp_get_num_threads() << " threads" << std::endl;
+    std::cout << "_OPENMP " << omp_get_max_threads() << " threads (max)" << std::endl;
 #endif
 
     const auto data_path = std::filesystem::path(DATA_PATH);
@@ -359,8 +370,6 @@ int main(int argc, char** argv) {
                 log("\nLoading data...\n");
                 auto base_data = ds.load_base();
                 auto query_data = ds.load_query();
-
-                log("Actual memory usage: %zu Mb, Max memory usage: %zu Mb\n", getCurrentRSS() / 1000000, getPeakRSS() / 1000000);
 
                 run_create_graph_test(ds, config.create_graph, config.nsg, graph_paths, base_data, query_data, "CREATE_GRAPH");
             }
