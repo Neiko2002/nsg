@@ -63,7 +63,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.iter = 12;
         conf.create_graph.S = 15;
         conf.create_graph.R = 200;
-        conf.create_graph.L_search = {500, 1000, 1500, 2000, 3000, 4000};
+        conf.create_graph.L_search = {500, 1000, 1500, 2000, 3000, 5000, 10000, 20000};
 
         conf.nsg.L = 50;
         conf.nsg.R = 70;
@@ -219,7 +219,8 @@ static void run_create_graph_test(const Dataset& ds,
                                   const GraphPaths& paths,
                                   const LoadedData& base_data,
                                   const LoadedData& query_data,
-                                  const std::string& test_name) {
+                                  const std::string& test_name,
+                                  bool force_test) {
     std::string graph_path = paths.nsg_file(cg, nsg);
     std::string log_path = paths.graph_log_file(cg, nsg);
     std::string knn_path = paths.efanna_file(cg);
@@ -231,11 +232,11 @@ static void run_create_graph_test(const Dataset& ds,
     }
 
     std::filesystem::create_directories(paths.graph_directory());
-    if (std::filesystem::exists(log_path)) {
+    if (!force_test && std::filesystem::exists(log_path)) {
         log("CREATE_GRAPH: Skipping - log file already exists: %s\n", log_path.c_str());
         return;
     }
-    set_log_file(log_path, true);
+    set_log_file(log_path, force_test);
     attach_cerr_to_log();
     attach_cout_to_log();
 
@@ -269,7 +270,11 @@ static void run_create_graph_test(const Dataset& ds,
     }
 
     reset_log_to_console();
-    log("%s: Log written to: %s\n", test_name.c_str(), log_path.c_str());
+    if (force_test) {
+        log("%s: Force test complete. Results appended to: %s\n", test_name.c_str(), log_path.c_str());
+    } else {
+        log("%s: Log written to: %s\n", test_name.c_str(), log_path.c_str());
+    }
 }
 
 int main(int argc, char** argv) {
@@ -294,9 +299,10 @@ int main(int argc, char** argv) {
     const auto data_path = std::filesystem::path(DATA_PATH);
     log("data_path %s\n", data_path.string().c_str());
 
-    DatasetName ds_name = DatasetName::ALL;
+    DatasetName ds_name = DatasetName::GLOVE;
     std::string data_root = data_path.string();
     bool do_run = true;
+    bool force_test = true;
 
     if (data_root.empty()) {
         log("WARNING: DATA_PATH is empty! Please provide it as a command line "
@@ -306,11 +312,16 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "help" || arg == "--help") {
-            log("Usage: nsg_build_and_test <dataset> [data_root] [--run|--dry-run]\n");
+            log("Usage: nsg_build_and_test <dataset> [data_root] [--run|--dry-run] [--force-test]\n");
             log("Datasets: sift1m, deep1m, audio, glove, enron, all\n");
             log("Options: [data_root] path (default: DATA_PATH), --run or "
-                "--dry-run\n");
+                "--dry-run, --force-test\n");
             return 0;
+        }
+
+        if (arg == "--force-test") {
+            force_test = true;
+            continue;
         }
 
         if (arg == "--run") {
@@ -374,7 +385,7 @@ int main(int argc, char** argv) {
                 auto base_data = ds.load_base();
                 auto query_data = ds.load_query();
 
-                run_create_graph_test(ds, config.create_graph, config.nsg, graph_paths, base_data, query_data, "CREATE_GRAPH");
+                run_create_graph_test(ds, config.create_graph, config.nsg, graph_paths, base_data, query_data, "CREATE_GRAPH", force_test);
             }
 
             return 0;
