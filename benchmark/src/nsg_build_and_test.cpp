@@ -23,7 +23,7 @@ struct DatasetConfig {
     DatasetName dataset_name = DatasetName::SIFT1M;
     Metric metric = Metric::L2;
 
-    CreateGraphParams create_graph;  // Used for KNN graph filename generation
+    EfannaGraphParams create_graph;  // Used for KNN graph filename generation
     NSGBuildParams nsg;
 };
 
@@ -75,6 +75,7 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.S = 25;
         conf.create_graph.R = 200;
         conf.create_graph.L_search = {100, 120, 140, 170, 200, 300};
+        conf.create_graph.anns_repeat = 5;
 
         conf.nsg.L = 150;
         conf.nsg.R = 60;
@@ -87,6 +88,8 @@ static DatasetConfig get_dataset_config(const DatasetName& dataset_name) {
         conf.create_graph.R = 100;
         conf.create_graph.nTrees = 0;
         conf.create_graph.mLevel = 0;
+        conf.create_graph.L_search = {100, 200, 300, 500};
+        conf.create_graph.anns_repeat = 10;
 
         conf.nsg.L = 200;
         conf.nsg.R = 30;
@@ -103,23 +106,23 @@ struct GraphPaths {
     GraphPaths(const Dataset& ds) : nsg_dir(ds.data_root() / ds.name() / "nsg"), efanna_dir(ds.data_root() / ds.name() / "efanna") {}
 
     // KNN graph base name (copied from efanna logic)
-    std::string knn_base_name(const CreateGraphParams& cg) const {
+    std::string knn_base_name(const EfannaGraphParams& cg) const {
         return string_format("K%u_L%u_It%u_S%u_R%u_(nTrees%u_mLevel%u)", cg.K, cg.L, cg.iter, cg.S, cg.R, cg.nTrees, cg.mLevel);
     }
 
-    std::string nsg_base_name(const CreateGraphParams& cg, const NSGBuildParams& nsg) const {
+    std::string nsg_base_name(const EfannaGraphParams& cg, const NSGBuildParams& nsg) const {
         return string_format("L%u_R%u_C%u_efa%s", nsg.L, nsg.R, nsg.C, knn_base_name(cg).c_str());
     }
 
     std::string graph_directory() const { return nsg_dir.string(); }
 
-    std::string efanna_file(const CreateGraphParams& cg) const { return (efanna_dir / (knn_base_name(cg) + ".efa")).string(); }
+    std::string efanna_file(const EfannaGraphParams& cg) const { return (efanna_dir / (knn_base_name(cg) + ".efa")).string(); }
 
-    std::string nsg_file(const CreateGraphParams& cg, const NSGBuildParams& nsg) const {
+    std::string nsg_file(const EfannaGraphParams& cg, const NSGBuildParams& nsg) const {
         return (nsg_dir / (nsg_base_name(cg, nsg) + ".nsg")).string();
     }
 
-    std::string graph_log_file(const CreateGraphParams& cg, const NSGBuildParams& nsg) const {
+    std::string graph_log_file(const EfannaGraphParams& cg, const NSGBuildParams& nsg) const {
         return (nsg_dir / (nsg_base_name(cg, nsg) + ".log")).string();
     }
 };
@@ -140,7 +143,7 @@ static void run_anns_test(efanna2e::Index* index,
                           size_t query_count,
                           size_t dim,
                           const Dataset& ds,
-                          const CreateGraphParams& cg,
+                          const EfannaGraphParams& cg,
                           bool use_half_gt) {
     auto ground_truth = ds.load_groundtruth(cg.anns_k, use_half_gt);
     wait_before_test();
@@ -154,7 +157,7 @@ static void run_explore_test(efanna2e::IndexNSG* index,
                              const float* query_data,
                              size_t query_count,
                              size_t dim,
-                             const CreateGraphParams& cg,
+                             const EfannaGraphParams& cg,
                              bool use_half_gt) {
     std::string entry_file = ds.explore_entry_vertex_file();
     const std::string explore_gt_file = ds.explore_groundtruth_file(use_half_gt);
@@ -211,7 +214,7 @@ static void run_explore_test(efanna2e::IndexNSG* index,
 }
 
 static void run_create_graph_test(const Dataset& ds,
-                                  const CreateGraphParams& cg,
+                                  const EfannaGraphParams& cg,
                                   const NSGBuildParams& nsg,
                                   const GraphPaths& paths,
                                   const LoadedData& base_data,

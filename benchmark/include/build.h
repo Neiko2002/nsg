@@ -19,7 +19,7 @@
 
 namespace nsg::benchmark {
 
-struct CreateGraphParams {
+struct EfannaGraphParams {
     // NNDescent parameters
     unsigned K = 50;     // Number of neighbors
     unsigned L = 70;     // Candidate list size

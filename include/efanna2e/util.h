@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 
-
 #ifdef __APPLE__
 #else
     #include <malloc.h>
@@ -48,20 +47,25 @@ static void GenRandom(std::mt19937& rng, unsigned* addr, unsigned size, unsigned
 }
 
 inline float* data_align(float* data_ori, unsigned point_num, unsigned& dim) {
-    float* data_new = 0;
     unsigned new_dim = (dim + DATA_ALIGN_FACTOR - 1) / DATA_ALIGN_FACTOR * DATA_ALIGN_FACTOR;
-    // std::cout << "align to new dim: "<<new_dim << std::endl;
-    struct alignas(DATA_ALIGN_FACTOR * 4) OverAligned {
-        char b;
-    };
-    size_t num_bytes = point_num * new_dim * sizeof(float);
-    size_t num_aligned = (num_bytes + sizeof(OverAligned) - 1) / sizeof(OverAligned);
-    data_new = (float*)new OverAligned[num_aligned];
 
-    for (unsigned i = 0; i < point_num; i++) {
+    // Aligned struct to force the allocator to provide correctly aligned memory.
+    // 32-byte alignment for AVX (8 * 4), 16-byte for SSE (4 * 4).
+    struct alignas(DATA_ALIGN_FACTOR * sizeof(float)) AlignedBlock {
+        char padding;
+    };
+
+    // Use size_t to prevent overflow for large datasets (e.g. Deep1B).
+    size_t total_bytes = (size_t)point_num * (size_t)new_dim * sizeof(float);
+    size_t num_blocks = (total_bytes + sizeof(AlignedBlock) - 1) / sizeof(AlignedBlock);
+
+    float* data_new = (float*)new AlignedBlock[num_blocks];
+
+    for (size_t i = 0; i < (size_t)point_num; i++) {
         memcpy(data_new + i * new_dim, data_ori + i * dim, dim * sizeof(float));
         memset(data_new + i * new_dim + dim, 0, (new_dim - dim) * sizeof(float));
     }
+
     dim = new_dim;
     delete[] data_ori;
     return data_new;
